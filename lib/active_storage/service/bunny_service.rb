@@ -138,6 +138,10 @@ module ActiveStorage
       client.object(key)
     end
 
+    def custom_metadata_headers(_metadata)
+      {}
+    end
+
     def storage_api_url(key)
       "https://#{storage_api_host}/#{storage_zone}/#{escaped_key(key)}"
     end
