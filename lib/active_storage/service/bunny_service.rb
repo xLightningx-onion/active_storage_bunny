@@ -86,12 +86,9 @@ module ActiveStorage
     end
 
     def headers_for_direct_upload(key, content_type:, checksum:, filename: nil, disposition: nil, custom_metadata: {}, **)
-      content_disposition = content_disposition_with(type: disposition, filename: filename) if filename
-
       {
         'AccessKey' => access_key,
         'Content-Type' => content_type,
-        'Content-Disposition' => content_disposition,
         **custom_metadata_headers(custom_metadata)
       }.compact
     end
