@@ -93,6 +93,13 @@ module ActiveStorage
       }.compact
     end
 
+    def download_chunk(key, range:, **)
+      instrument :download_chunk, key: key, range: range do
+        data = object_for(key).get_file
+        range ? data.byteslice(range) : data
+      end
+    end
+
     private
 
     def blank_to_nil(value)
@@ -136,13 +143,6 @@ module ActiveStorage
 
     def custom_metadata_headers(_metadata)
       {}
-    end
-
-    def download_chunk(key, range:, **)
-      instrument :download_chunk, key: key, range: range do
-        data = object_for(key).get_file
-        range ? data.byteslice(range) : data
-      end
     end
 
     def storage_api_url(key)
