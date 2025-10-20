@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'active_support/core_ext/numeric/bytes'
+require 'cgi'
 require 'bunny_storage_client'
 
 module ActiveStorage
@@ -8,9 +9,12 @@ module ActiveStorage
   # See ActiveStorage::Service for the generic API documentation that applies to all services.
   class Service::BunnyService < Service
 
-    attr_reader :client, :base_url
+    attr_reader :client, :base_url, :access_key, :storage_zone, :region
 
     def initialize(access_key:, api_key:, storage_zone:, region:, cdn: false)
+      @access_key = access_key
+      @storage_zone = storage_zone
+      @region = blank_to_nil(region)
       @client = BunnyStorageClient.new(access_key, api_key, storage_zone, region)
 
       if cdn
@@ -73,9 +77,7 @@ module ActiveStorage
 
     def url_for_direct_upload(key, expires_in:, content_type:, content_length:, checksum:, custom_metadata: {})
       instrument :url, key: key do |payload|
-        generated_url = object_for(key).presigned_url :put, expires_in: expires_in.to_i,
-                                                            content_type: content_type, content_length: content_length, content_md5: checksum,
-                                                            metadata: custom_metadata, whitelist_headers: ['content-length'], **upload_options
+        generated_url = storage_api_url(key)
 
         payload[:url] = generated_url
 
@@ -86,10 +88,24 @@ module ActiveStorage
     def headers_for_direct_upload(key, content_type:, checksum:, filename: nil, disposition: nil, custom_metadata: {}, **)
       content_disposition = content_disposition_with(type: disposition, filename: filename) if filename
 
-      { 'Content-Type' => content_type, 'Content-MD5' => checksum, 'Content-Disposition' => content_disposition, **custom_metadata_headers(custom_metadata) }
+      {
+        'AccessKey' => access_key,
+        'Content-Type' => content_type,
+        'Content-MD5' => checksum,
+        'Content-Disposition' => content_disposition,
+        **custom_metadata_headers(custom_metadata)
+      }.compact
     end
 
     private
+
+    def blank_to_nil(value)
+      return nil if value.nil?
+      return nil if value.respond_to?(:strip) && value.strip.empty?
+      return nil if value.respond_to?(:empty?) && value.empty?
+
+      value
+    end
 
     def private_url(key, expires_in:, filename:, disposition:, content_type:, **)
       # BunnyStorageClient does not natively support this operation yet.
@@ -97,7 +113,7 @@ module ActiveStorage
     end
 
     def public_url(key)
-      File.join(base_url, key)
+      "#{base_url.to_s.sub(%r{/*$}, '')}/#{key}"
     end
 
     def upload_with_single_part(key, io, checksum: nil, content_type: nil, content_disposition: nil, custom_metadata: {})
@@ -120,6 +136,18 @@ module ActiveStorage
 
     def object_for(key)
       client.object(key)
+    end
+
+    def storage_api_url(key)
+      "https://#{storage_api_host}/#{storage_zone}/#{escaped_key(key)}"
+    end
+
+    def storage_api_host
+      region ? "#{region}.storage.bunnycdn.com" : 'storage.bunnycdn.com'
+    end
+
+    def escaped_key(key)
+      key.split('/').map { |part| CGI.escape(part) }.join('/')
     end
   end
 end
