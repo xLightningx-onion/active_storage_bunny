@@ -93,10 +93,12 @@ module ActiveStorage
       }.compact
     end
 
-    def download_chunk(key, range:, **)
-      instrument :download_chunk, key: key, range: range do
+    def download_chunk(key, range_or_options, **options)
+      actual_range = extract_range_argument(range_or_options, options)
+
+      instrument :download_chunk, key: key, range: actual_range do
         data = object_for(key).get_file
-        range ? data.byteslice(range) : data
+        actual_range ? data.byteslice(actual_range) : data
       end
     end
 
@@ -143,6 +145,13 @@ module ActiveStorage
 
     def custom_metadata_headers(_metadata)
       {}
+    end
+
+    def extract_range_argument(range_or_options, options)
+      return options[:range] if range_or_options.is_a?(Hash) && range_or_options.empty?
+      return range_or_options[:range] if range_or_options.is_a?(Hash)
+
+      options[:range] || range_or_options
     end
 
     def storage_api_url(key)
