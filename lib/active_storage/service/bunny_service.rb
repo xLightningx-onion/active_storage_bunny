@@ -138,6 +138,13 @@ module ActiveStorage
       {}
     end
 
+    def download_chunk(key, range:, **)
+      instrument :download_chunk, key: key, range: range do
+        data = object_for(key).get_file
+        range ? data.byteslice(range) : data
+      end
+    end
+
     def storage_api_url(key)
       "https://#{storage_api_host}/#{storage_zone}/#{escaped_key(key)}"
     end
