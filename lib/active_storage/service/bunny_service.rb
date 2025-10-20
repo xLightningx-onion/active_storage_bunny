@@ -91,7 +91,6 @@ module ActiveStorage
       {
         'AccessKey' => access_key,
         'Content-Type' => content_type,
-        'Content-MD5' => checksum,
         'Content-Disposition' => content_disposition,
         **custom_metadata_headers(custom_metadata)
       }.compact
